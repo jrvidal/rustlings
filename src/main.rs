@@ -82,10 +82,11 @@ fn main() {
         std::process::exit(1);
     }
 
-    if !rustc_exists() {
-        println!("We cannot find `rustc`.");
-        println!("Try running `rustc --version` to diagnose your problem.");
-        println!("For instructions on how to install Rust, check the README.");
+    if let Err(e) = rustc_exists() {
+        eprintln!("We cannot find `rustc`.");
+        eprintln!("Try running `rustc --version` to diagnose your problem.");
+        eprintln!("For instructions on how to install Rust, check the README.");
+        eprintln!("Reported error: {:?}", e);
         std::process::exit(1);
     }
 
@@ -241,12 +242,19 @@ fn watch(exercises: &[Exercise], verbose: bool) -> notify::Result<()> {
     }
 }
 
-fn rustc_exists() -> bool {
-    Command::new("rustc")
+fn rustc_exists() -> Result<(), io::Error> {
+    let mut child = Command::new("rustc")
         .args(&["--version"])
         .stdout(Stdio::null())
-        .spawn()
-        .and_then(|mut child| child.wait())
-        .map(|status| status.success())
-        .unwrap_or(false)
+        .spawn()?;
+    let status = child.wait()?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("`rustc --version` exited with {:?}", status.code()),
+        ))
+    }
 }
